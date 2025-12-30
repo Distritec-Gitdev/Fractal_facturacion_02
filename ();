@@ -1,0 +1,24 @@
+[90m= [39m[34;4mApp\Models\User[39;24m {#4283
+    [34mid[39m: [35m8[39m,
+    [34mname[39m: "[32msocio[39m",
+    [34memail[39m: "[32msocio@gmail.com[39m",
+    [34memail_verified_at[39m: [36mnull[39m,
+    [34mcedula[39m: "[32m1099682471[39m",
+    [34mpassword[39m: "[32m$2y$12$BNOOKwhXFccjhkOxHqmGxOXJmFBuGllgSMglwEzFXuHNhC7gdLpEK[39m",
+    [34mremember_token[39m: [36mnull[39m,
+    [34mcreated_at[39m: "[32m2025-08-13 11:01:09[39m",
+    [34mupdated_at[39m: "[32m2025-08-13 11:36:12[39m",
+  }
+
+[90m= [39m[34;4mApp\Models\User[39;24m {#11001
+    [34mid[39m: [35m8[39m,
+    [34mname[39m: "[32msocio[39m",
+    [34memail[39m: "[32msocio@gmail.com[39m",
+    [34memail_verified_at[39m: "[32m2025-08-22 00:00:00[39m",
+    [34mcedula[39m: "[32m4617696[39m",
+    [34mpassword[39m: "[32m$2y$12$lktTDQWaWmZ4jm1SUpa5DeaVkIG0eckhMQOUYa3MR4sa3uHaqcnBq[39m",
+    [34mremember_token[39m: [36mnull[39m,
+    [34mcreated_at[39m: "[32m2025-08-13 11:01:09[39m",
+    [34mupdated_at[39m: "[32m2025-09-12 15:02:05[39m",
+  }
+

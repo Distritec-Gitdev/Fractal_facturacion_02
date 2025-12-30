@@ -1,0 +1,12 @@
+[90m= [39m[34;4mApp\Models\User[39;24m {#8171
+    [34mid[39m: [35m9[39m,
+    [34mname[39m: "[32magente_admin[39m",
+    [34memail[39m: "[32mnata1998restrepo@gmail.com[39m",
+    [34memail_verified_at[39m: [36mnull[39m,
+    [34mcedula[39m: "[32m1088348802[39m",
+    [34mpassword[39m: "[32m$2y$12$E5/A44tKXD3O9dXOdQyyL.uDBbI8AYTz9RObWhWTEU4TOLwF.u/5q[39m",
+    [34mremember_token[39m: [36mnull[39m,
+    [34mcreated_at[39m: "[32m2025-09-12 10:16:55[39m",
+    [34mupdated_at[39m: "[32m2025-09-12 10:25:07[39m",
+  }
+

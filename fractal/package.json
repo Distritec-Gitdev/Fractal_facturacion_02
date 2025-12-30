@@ -1,0 +1,28 @@
+{
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "node node_modules/vite/bin/vite.js --host 0.0.0.0 --port 5174",
+        "build": "node node_modules/vite/bin/vite.js build"
+    },
+    "devDependencies": {
+        "@tailwindcss/postcss": "^4.1.11",
+        "@vitejs/plugin-basic-ssl": "^2.0.0",
+        "autoprefixer": "^10.4.21",
+        "axios": "^1.6.4",
+        "laravel-vite-plugin": "^1.0.0",
+        "postcss": "^8.5.6",
+        "tailwindcss": "^4.1.11",
+        "vite": "^6.3.5"
+    },
+    "dependencies": {
+        "@alpinejs/focus": "^3.14.9",
+        "@alpinejs/intersect": "^3.14.9",
+        "@tailwindcss/aspect-ratio": "^0.4.2",
+        "@tailwindcss/forms": "^0.5.10",
+        "@tailwindcss/typography": "^0.5.16",
+        "alpinejs": "^3.14.9",
+        "laravel-echo": "^2.1.5",
+        "pusher-js": "^8.4.0"
+    }
+}
