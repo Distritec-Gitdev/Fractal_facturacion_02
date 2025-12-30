@@ -209,8 +209,8 @@ class ConsignacionResource extends Resource
                                         if (!$codigoSucursal) {
                                             return \App\Models\ZBodegaFacturacion::query()
                                                 ->where('ID_Sede', 49)
-                                                ->orderBy('Nombre_Bog')
-                                                ->pluck('Nombre_Bog', 'Cod_Bog');
+                                                ->orderBy('Nombre_Bodega')
+                                                ->pluck('Nombre_Bodega', 'Cod_Bog');
                                         }
 
                                         $idSede = \App\Models\Sede::where('Codigo_de_sucursal', $codigoSucursal)
@@ -219,14 +219,14 @@ class ConsignacionResource extends Resource
                                         if (!$idSede) {
                                             return \App\Models\ZBodegaFacturacion::query()
                                                 ->where('ID_Sede', 49)
-                                                ->orderBy('Nombre_Bog')
-                                                ->pluck('Nombre_Bog', 'Cod_Bog');
+                                                ->orderBy('Nombre_Bodega')
+                                                ->pluck('Nombre_Bodega', 'Cod_Bog');
                                         }
 
                                         $datosCombinados = \App\Models\ZBodegaFacturacion::query()
                                             ->whereIn('ID_Sede', [$idSede, 49])
-                                            ->orderBy('Nombre_Bog')
-                                            ->pluck('Nombre_Bog', 'Cod_Bog');
+                                            ->orderBy('Nombre_Bodega')
+                                            ->pluck('Nombre_Bodega', 'Cod_Bog');
 
                                         return $datosCombinados;
                                     })
@@ -235,7 +235,7 @@ class ConsignacionResource extends Resource
                                         $set('codigo_bodega', $state);
 
                                         $bodega = \App\Models\ZBodegaFacturacion::where('Cod_Bog', $state)->first();
-                                        $set('nombre_bodega', $bodega?->Nombre_Bog);
+                                        $set('nombre_bodega', $bodega?->Nombre_Bodega);
 
                                         // Actualizar el campo display
                                         $set('codigo_bodega_display', $state);
@@ -271,14 +271,14 @@ class ConsignacionResource extends Resource
                                                     });
 
                                                     if (targetButton) {
-                                                        console.log('✅ Botón encontrado en intento:', intentos);
+                                                        console.log('Botón encontrado en intento:', intentos);
                                                         // Hacer scroll al botón para que sea visible
                                                         targetButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                                     } else if (intentos < 10) {
-                                                        console.log('⏳ Botón no encontrado, reintentando...', intentos);
+                                                        console.log('Botón no encontrado, reintentando...', intentos);
                                                         setTimeout(() => intentarClick(intentos + 1), 200);
                                                     } else {
-                                                        console.error('❌ No se pudo encontrar el botón después de 10 intentos');
+                                                        console.error('No se pudo encontrar el botón después de 10 intentos');
                                                     }
                                                 };
 
@@ -391,7 +391,7 @@ class ConsignacionResource extends Resource
                                                                 if (!$codigoBodega) {
                                                                     return new HtmlString(
                                                                         '<div class="text-center p-4 bg-yellow-50 text-yellow-700 rounded-lg">
-                                                                            ⚠️ Por favor, seleccione una bodega primero.
+                                                                            Por favor, seleccione una bodega primero.
                                                                         </div>'
                                                                     );
                                                                 }
@@ -399,7 +399,7 @@ class ConsignacionResource extends Resource
                                                                 if (!$cedulaCliente) {
                                                                     return new HtmlString(
                                                                         '<div class="text-center p-4 bg-yellow-50 text-yellow-700 rounded-lg">
-                                                                            ⚠️ Por favor, ingrese la cédula del cliente primero.
+                                                                            Por favor, ingrese la cédula del cliente primero.
                                                                         </div>'
                                                                     );
                                                                 }
