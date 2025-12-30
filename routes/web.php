@@ -1,16 +1,22 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
+
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\Api\ClienteController as ApiClienteController;
 use App\Http\Controllers\ClienteDocumentacionController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\UserController;
-use App\Http\Livewire\ClienteDocumentacion;
-use App\Models\Cliente;
-use App\Models\Imagenes;
 use App\Http\Livewire\ClienteDocumentacionStandalone;
 use App\Http\Controllers\Api\SecureFileController;
+use App\Http\Controllers\ReciboFacturaController;
+use App\Http\Livewire\Consignaciones;
+
+use Illuminate\Http\Request;
+use App\Filament\Resources\FacturacionResource\Forms\ModalProductosVariante;
+
+
 // ---------------------------------------------------------
 // Rutas públicas básicas
 // ---------------------------------------------------------
@@ -30,25 +36,31 @@ Route::get('/test-event', function () {
 // Chat flotante (sólo autenticados)
 // ---------------------------------------------------------
 Route::middleware(['web', 'auth'])->group(function () {
-    // Persistir cliente seleccionado para el widget (usa role de Spatie)
+
+    // Persistir cliente seleccionado para el widget (Spatie roles)
     Route::post('/filament/chat/set-client/{clientId}', function (int $clientId) {
         session()->put('chatClientId', $clientId);
         return response()->noContent();
-    })->name('filament.chat.set-client')->middleware('role:admin|socio|gestor cartera|asesor_agente|super_admin')
-      ->whereNumber('clientId');
+    })
+        ->name('filament.chat.set-client')
+        ->middleware('role:admin|socio|gestor cartera|asesor_agente|super_admin')
+        ->whereNumber('clientId');
 
     // Endpoints del chat (API interna del widget)
     Route::prefix('admin/chat')->name('admin.chat.')->group(function () {
+
         Route::get('/messages/{clientId}', [ChatController::class, 'getMessages'])
-            ->name('messages');
+            ->name('messages')
+            ->whereNumber('clientId');
 
         Route::post('/send', [ChatController::class, 'sendMessage'])
             ->name('send');
     });
 
-    // Contador de no leídos (mejor también con auth)
+    // Contador de no leídos
     Route::get('/chats/{clientId}/unread-count', [ChatController::class, 'unreadCount'])
-        ->name('chat.unread-count');
+        ->name('chat.unread-count')
+        ->whereNumber('clientId');
 });
 
 // ---------------------------------------------------------
@@ -75,11 +87,11 @@ Route::get('/pdf/krediya-antifraude/{id_cliente}', [ApiClienteController::class,
 Route::get('/pdf/alo-antifraude/{id_cliente}', [ApiClienteController::class, 'generarAloAntifraude'])
     ->name('pdf.alo-antifraude');
 
-// Finalización proceso cliente (si este es público por token, déjalo sin auth)
+// Finalización proceso cliente (público por token)
 Route::post('/cliente/finalizar', [ApiClienteController::class, 'finalizarProceso'])
     ->name('cliente.finalizar');
 
-// Guardar “acepto términos” (si lo usa el cliente público)
+// Guardar “acepto términos” (público)
 Route::post('/guardar-termino', [ApiClienteController::class, 'guardarTermino'])
     ->name('guardar.termino');
 
@@ -87,6 +99,7 @@ Route::post('/guardar-termino', [ApiClienteController::class, 'guardarTermino'])
 // Admin: gestión de PDFs (protegido)
 // ---------------------------------------------------------
 Route::middleware(['auth', 'role:admin|socio|gestor cartera|asesor_agente|super_admin'])->group(function () {
+
     Route::get('/admin/pdfs', [ApiClienteController::class, 'listarPDFs'])
         ->name('admin.pdfs.list');
 
@@ -104,27 +117,12 @@ Route::get('/phpinfo', function () {
     phpinfo();
 })->middleware(['auth', 'role:admin']);
 
-// Subida de documentación del cliente (protegido; ajusta si el cliente final lo usa)
+// ---------------------------------------------------------
+// Documentación del cliente (protegido)
+// ---------------------------------------------------------
 Route::post('/clientes/{cliente}/documentacion', [ClienteDocumentacionController::class, 'store'])
     ->name('clientes.documentacion.store')
     ->middleware(['auth']);
-
-// ---------------------------------------------------------
-// Reportes y Usuarios (admin / permisos)
-// ---------------------------------------------------------
-Route::get('/reporte', [ReportController::class, 'index'])
-    ->middleware(['auth', 'permission:reports.view'])
-    ->name('reporte');
-
-Route::resource('users', UserController::class)
-    ->middleware(['auth', 'role:admin']);
-
-
-Route::post('/clientes/{cliente}/documentacion', [ClienteDocumentacionController::class, 'store'])
-    ->name('clientes.documentacion.store');
-
-
-
 
 Route::get('/cliente/{cliente}/documentacion', ClienteDocumentacionStandalone::class)
     ->name('cliente.documentacion');
@@ -136,33 +134,73 @@ Route::get('/cliente/{cliente}/dashboard', [ApiClienteController::class, 'dashbo
     ->name('cliente.dashboard')
     ->middleware(['auth']);
 
-// (Si este es distinto al de /cliente/finalizar)
 Route::post('/cliente/finalizar-proceso', [ApiClienteController::class, 'finalizarProceso'])
     ->name('finalizar.proceso');
 
-// Firma del cliente (si requiere login del usuario interno, deja auth; si es público por token, quítalo)
+// Firma del cliente (protegido)
 Route::post('/cliente/{id}/firma', [ApiClienteController::class, 'guardarFirma'])
     ->name('cliente.guardarFirma')
     ->middleware(['web', 'auth']);
 
-Route::get('/admin/chat/messages/{clientId}', [ChatController::class, 'getMessages'])
-    ->name('admin.chat.messages')
-    ->whereNumber('clientId');
-
-Route::get('/chats/{clientId}/unread-count', [ChatController::class, 'unreadCount'])
-    ->name('chat.unread-count')
-    ->whereNumber('clientId');
-
-Route::post('/filament/chat/set-client/{clientId}', function (int $clientId) {
-    session()->put('chatClientId', $clientId);
-    return response()->noContent();
-})->name('filament.chat.set-client')
-  ->middleware('role:admin|socio|gestor cartera|asesor_agente|super_admin')
-  ->whereNumber('clientId');
-
-
+// ---------------------------------------------------------
+// Acceso seguro a documentos
+// ---------------------------------------------------------
 Route::get('/docs/{cliente}/{file}', [SecureFileController::class, 'show'])
     ->where(['cliente' => '[0-9]+', 'file' => '.*'])
-    ->middleware('auth')             // exige sesión Laravel
+    ->middleware('auth')
     ->name('docs.show');
 
+// ---------------------------------------------------------
+// ✅ FACTURACIÓN: Preview + Guardar PNG (SIN Chrome)
+// ---------------------------------------------------------
+// Route::get('/admin/facturacion/recibo/preview/{key}', [ReciboFacturaController::class, 'preview'])
+//     ->middleware(['auth'])
+//     ->name('facturas.recibo.preview');
+
+// Route::post('/admin/facturacion/recibo/store/{key}', [ReciboFacturaController::class, 'store'])
+//     ->middleware(['auth'])
+//     ->name('facturas.recibo.store');
+
+// ---------------------------------------------------------
+// FACTURACIÓN: Ver factura (SERVIDO DIRECTO)
+// ---------------------------------------------------------
+Route::middleware(['web', 'auth'])->group(function () {
+    Route::get('/admin/facturacion/factura/{key}', [ReciboFacturaController::class, 'show'])
+        ->name('facturas.factura.show');
+});
+// ---------------------------------------------------------
+// Reportes y Usuarios
+// ---------------------------------------------------------
+Route::get('/reporte', [ReportController::class, 'index'])
+    ->middleware(['auth', 'permission:reports.view'])
+    ->name('reporte');
+
+Route::resource('users', UserController::class)
+    ->middleware(['auth', 'role:admin']);
+
+
+// ruta para validacion de productos en consignacion 
+Route::post('/facturacion/validar-consignacion', function (Request $request) {
+    $data = ModalProductosVariante::validarEnConsignaciones(
+        (string) $request->input('cantidadSeleccionada', ''),
+        (string) $request->input('codigoProducto', ''),
+        (string) $request->input('codigo_bodega', ''),
+        (string) $request->input('codigoVariante', ''),
+        (string) $request->input('existenciaDisponible', ''),
+    );
+
+    return response()->json($data);
+})
+->name('facturacion.validar-consignacion')
+->middleware(['web', 'auth']);
+
+
+
+
+
+
+
+// Agregar después de la línea 155 (después de users)
+Route::get('/admin/consignaciones', Consignaciones::class)
+    ->name('admin.consignaciones')
+    ->middleware(['auth', 'role:admin|socio|gestor cartera|super_admin']);

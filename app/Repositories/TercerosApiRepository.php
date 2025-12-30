@@ -329,4 +329,69 @@ protected function extraerTipoDocumento(array $row): ?string
             throw $e;
         }
     }
+
+
+    public function buscarCoincidencias(string $query): array
+{
+    try {
+        $token = $this->getApiToken();
+        if (!$token) {
+            throw new Exception('No se pudo obtener el token de la API de terceros.');
+        }
+
+        $url = $this->config['url'];
+
+        $requestBody = [
+            'filtrar'           => true,
+            'buscarResponsables'=> false,
+            'activos'           => true,
+            'inactivos'         => false,
+            'relacion'          => ['C', 'P'],
+            'busquedaRapida'    => $query,   // 🔍 aquí puede ir cédula o nombre
+            'listaEstados'      => ['A'],
+        ];
+
+        $headersWithToken = $this->headers;
+        $headersWithToken['Authorization'] = 'Bearer ' . $token;
+
+        Log::info('TercerosRepository - buscarCoincidencias request:', [
+            'url'    => $url,
+            'body'   => $requestBody,
+            'query'  => $query,
+        ]);
+
+        $response = Http::timeout(60)
+            ->retry(3, 2000)
+            ->withHeaders($headersWithToken)
+            ->post($url, $requestBody);
+
+        Log::info('TercerosRepository - buscarCoincidencias raw response:', [
+            'status' => $response->status(),
+            'body'   => $response->body(),
+        ]);
+
+        if ($response->failed()) {
+            throw new Exception('Error en la respuesta de la API: ' . $response->status());
+        }
+
+        $data = $response->json();
+
+        if (! isset($data['datos']) || ! isset($data['datos']['nits']) || ! is_array($data['datos']['nits'])) {
+            Log::warning('TercerosRepository - estructura inesperada en buscarCoincidencias', [
+                'data' => $data,
+            ]);
+            return [];
+        }
+
+        // 👈 AQUÍ devolvemos TODA la lista de coincidencias cruda.
+        return $data['datos']['nits'];
+
+    } catch (Exception $e) {
+        $this->logError('Error en buscarCoincidencias', $e, [
+            'query' => $query,
+        ]);
+        throw $e;
+    }
+}
+
 }
