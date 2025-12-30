@@ -39,7 +39,6 @@ class ZModelo extends Model
      *
      * @var array<int, string>
      */
-
     protected $fillable = [
         'idmarca',        // FK -> z_marca.idmarca
         'id_categoria',   // FK -> z_categoria.id_categoria

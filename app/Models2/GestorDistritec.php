@@ -10,8 +10,7 @@ class GestorDistritec extends Model
     protected $primaryKey = 'ID_Gestor';
     
     protected $fillable = [
-       // 'ID_Gestor',
-        'Nombre_gestor',
-        'estado'
+        'ID_Gestor',
+        'Nombre_gestor'
     ];
 }

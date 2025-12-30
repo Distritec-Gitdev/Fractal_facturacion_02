@@ -49,7 +49,7 @@ class User extends Authenticatable implements FilamentUser
             'socio',
             'agente_admin',
             'auxiliar_socio',
-            'administrativo'
+            'administrativo',
         ];
 
         if (! $this->hasAnyRole($allowedRoles)) {
