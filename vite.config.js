@@ -17,9 +17,9 @@ export default defineConfig({
             protocol: 'wss',
         },
         // cors: {
-        //     origin: 'https://fractal.distritec.cloud',
+        //     origin: 'https://beta.fractal.distritec.cloud',
         // },
-        // origin: 'https://fractal.distritec.cloud',
+        // origin: 'https://beta.fractal.distritec.cloud',
     },
 
       css: {
