@@ -10,113 +10,123 @@ use Illuminate\Support\Facades\Http;
 class TercerosApiService
 {
     protected $repository;
-    protected $tokenPath;
-    protected $tokenIncludePath;
 
     public function __construct(TercerosRepositoryInterface $repository)
     {
         $this->repository = $repository;
-        $this->tokenPath = app_path('conexion_api_yeminus/respuesta.json');
-        $this->tokenIncludePath = app_path('conexion_api_yeminus/token_1.php');
     }
 
     /**
-     * Obtiene un nuevo token de la API de Yeminus.
-     *
-     * @return string El access token.
-     * @throws Exception Si no se puede obtener el token.
+     * Obtiene un nuevo token desde la API de Yeminus usando variables de entorno.
      */
     protected function fetchTokenFromApi(): string
     {
         try {
-            $response = Http::asForm()->post('https://distritec.yeminus.com/apidistritec/token', [
-                'username' => 'API', // <<== Considerar usar variables de entorno
-                'password' => 'Api2025*', // <<== Considerar usar variables de entorno
-                'grant_type' => 'password',
+            $response = Http::asForm()->post(
+                env('DISTRITEC_TOKEN_URL', 'https://distritec.yeminus.com/apidistritec/token'),
+                [
+                    'username'   => env('DISTRITEC_API_USERNAME'),
+                    'password'   => env('DISTRITEC_API_PASSWORD'),
+                    'grant_type' => 'password',
+                ]
+            );
+
+            Log::info('API Yeminus - Token response', [
+                'status' => $response->status(),
+                'body'   => $response->json()
             ]);
 
-            // Loguear la respuesta del token para depuración
-            Log::info('Respuesta API Yeminus - Obtener Token:', ['status' => $response->status(), 'body' => $response->json()]);
-
-            $response->throw(); // Lanza una excepción si la respuesta tiene un estado de error (4xx o 5xx)
+            $response->throw();
 
             $data = $response->json();
 
-            if (isset($data['access_token'])) {
-                return $data['access_token'];
-            } else {
-                Log::error('API Yeminus - Token no encontrado en la respuesta:', ['response' => $data]);
+            if (!isset($data['access_token'])) {
+                Log::error('API Yeminus - access_token no encontrado', ['response' => $data]);
                 throw new Exception('Access token no encontrado en la respuesta de la API.');
             }
 
+            return $data['access_token'];
+
         } catch (Exception $e) {
             Log::error('API Yeminus - Error al obtener token:', ['exception' => $e]);
-            throw new Exception('Error al comunicarse con la API de Yeminus para obtener el token: ' . $e->getMessage());
+            throw new Exception("Error obteniendo token: " . $e->getMessage());
         }
     }
 
     /**
-     * Obtiene el token de la API. Actualmente siempre obtiene uno nuevo.
-     * Se podría añadir lógica de caché para reutilizar tokens válidos.
-     *
-     * @return string El token de la API.
-     * @throws Exception Si no se puede obtener el token.
+     * Devuelve token (actualmente siempre nuevo — opcional: implementar caché).
      */
-    protected function getApiToken(): string
+    public function getApiToken(): string
     {
-        // Por ahora, siempre obtenemos un token nuevo. En producción, se debería añadir caché.
         return $this->fetchTokenFromApi();
     }
 
+    /**
+     * Crear tercero en Yeminus
+     */
     public function crearTercero(array $datosTercero)
     {
         try {
-            $token = $this->getApiToken(); // Usar el nuevo método para obtener el token
+            $token = $this->getApiToken();
 
-            // Construir el cuerpo exacto de la solicitud, asegurando permitirTerceroDuplicado es true
-            $requestBody = [
-                'nitModel' => array_merge($datosTercero, ['permitirTerceroDuplicado' => true]) // Combinar datos y asegurar flag true
+            $body = [
+                'nitModel' => array_merge($datosTercero, [
+                    'permitirTerceroDuplicado' => true
+                ])
             ];
 
             $response = Http::withHeaders([
-                'id_empresa' => '02', // Según Postman
-                'usuario' => 'ANALISTACIAL', // Según Postman
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $token,
-            ])->post('https://distritec.yeminus.com/apidistritec/api/general/terceros/agregar', $requestBody); // Usar el cuerpo construido
+                'id_empresa'  => env('DISTRITEC_EMPRESA'),
+                'usuario'     => env('DISTRITEC_USUARIO'),
+                'Content-Type'=> 'application/json',
+                'Authorization' => "Bearer {$token}",
+            ])->post(
+                'https://distritec.yeminus.com/apidistritec/api/general/terceros/agregar',
+                $body
+            );
 
-            // Loguear la respuesta completa para depuración, incluyendo el cuerpo de la solicitud EXACTO que se envió
-            Log::info('Respuesta API Yeminus - Crear Tercero:', [
+            Log::info('API Yeminus - Crear tercero', [
                 'status' => $response->status(),
-                'body' => $response->json(),
-                'request_body_sent' => $requestBody // Loguear el cuerpo EXACTO enviado
+                'body'   => $response->json(),
+                'sent'   => $body
             ]);
 
-            // Devolver la respuesta como un array asociativo
             return $response->json();
 
         } catch (Exception $e) {
+
             Log::error('TercerosApiService - Error al crear tercero:', [
                 'exception' => $e,
-                'datos_enviados_antes_construir_body' => $datosTercero // Loguear el array original por si acaso
+                'datos_enviados' => $datosTercero
             ]);
-            // Podrías re-lanzar la excepción o devolver un formato de error específico
-            throw new Exception('Error al comunicarse con la API de Yeminus para crear el tercero: ' . $e->getMessage());
+
+            throw new Exception("Error creando tercero: " . $e->getMessage());
         }
     }
+
 
     public function buscarPorCedula($cedula, $tipoDocumento)
     {
-        Log::info('TercerosApiService - buscarPorCedula recibidos:', ['cedula' => $cedula, 'tipoDocumento' => $tipoDocumento]);
+        Log::info('TercerosApiService - buscarPorCedula:', [
+            'cedula' => $cedula,
+            'tipoDocumento' => $tipoDocumento
+        ]);
 
         try {
-            $resultadoRepository = $this->repository->buscarPorCedula($cedula, $tipoDocumento);
-            Log::info('TercerosApiService - resultado repository:', ['resultado' => $resultadoRepository]);
-            return $resultadoRepository;
+            return $this->repository->buscarPorCedula($cedula, $tipoDocumento);
+
         } catch (Exception $e) {
-            Log::error('TercerosApiService - Error en repositorio:', ['exception' => $e, 'cedula' => $cedula, 'tipoDocumento' => $tipoDocumento]);
+            Log::error('TercerosApiService - Error repo Cedula:', [
+                'exception' => $e
+            ]);
             throw $e;
         }
     }
-}
 
+    public function buscarTercerosPorQuery(string $query): array
+    {
+        Log::info('TercerosApiService - buscarTercerosPorQuery:', ['query' => $query]);
+
+        return $this->repository->buscarCoincidencias($query);
+    }
+}

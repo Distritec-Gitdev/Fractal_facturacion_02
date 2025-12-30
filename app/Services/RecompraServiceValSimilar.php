@@ -76,7 +76,7 @@ class RecompraServiceValSimilar
                     }
                     [$t, $c] = [$src[0], $src[1]];
                     $strat   = $src[2] ?? $strategy;
-                    $opts    = \is_array($src[3] ?? null) ? array_merge($options, $src[3]) : $options;
+                    $opts    = [];
 
                     $found = $found || $this->runStrategy($strat, $t, $c, $valor, $opts);
                     if ($found) break; // si con una basta, cortamos
