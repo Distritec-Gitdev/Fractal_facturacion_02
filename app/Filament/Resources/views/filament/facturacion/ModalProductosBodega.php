@@ -21,7 +21,7 @@ class ModalProductosBodega
         ?array $array_codigos = null,
         ?array $array_bodega = null,
         int $page = 1,
-        int $perPage = 10
+        int $perPage = 8
     ): string {
         $busquedaCodigo = $codigo;
         $busquedaNombre = $nombre;

@@ -34,6 +34,9 @@ use App\Models\Reserva_venta;
 use App\Models\AaPrin;
 use App\Models\InfTrab;
 use Filament\Support\Exceptions\Halt;
+use Illuminate\Support\Facades\Session;
+
+
 
 
 
@@ -45,6 +48,40 @@ class InformacionClienteStep
         return Step::make('Información del cliente')
             ->icon('heroicon-o-identification') //  Datos del cliente
             ->schema([
+
+                // ✅ AQUÍ (schema principal del Step)
+        Hidden::make('cedula_cliente_real')
+            ->default(null)
+            ->dehydrated(false)
+            ->live(),
+
+        // (si ya tienes estos, también van aquí)
+        Hidden::make('auto_tercero_done')->default(false)->dehydrated(false),
+        Hidden::make('auto_tercero_lock')->default(false)->dehydrated(false),
+        Hidden::make('auto_tercero_cedula')->default(null)->dehydrated(false),
+
+        Hidden::make('cedula_cliente_real')->default(null)->dehydrated(false)->live(),
+        Hidden::make('tipo_identificacion_cliente_real')->default(null)->dehydrated(false)->live(),
+
+        Hidden::make('nombre_cliente_real')->default(null)->dehydrated(false),
+        Hidden::make('nombre1_cliente_real')->default(null)->dehydrated(false),
+        Hidden::make('nombre2_cliente_real')->default(null)->dehydrated(false),
+        Hidden::make('apellido1_cliente_real')->default(null)->dehydrated(false),
+        Hidden::make('apellido2_cliente_real')->default(null)->dehydrated(false),
+
+        Hidden::make('telefono_real')->default(null)->dehydrated(false),
+        Hidden::make('email_cliente_real')->default(null)->dehydrated(false),
+        Hidden::make('ciudad_cliente_real')->default(null)->dehydrated(false),
+        Hidden::make('zona_cliente_real')->default(null)->dehydrated(false),
+        Hidden::make('nombre_comercial_cliente_real')->default(null)->dehydrated(false),
+        Hidden::make('barrio_cliente_real')->default(null)->dehydrated(false),
+        Hidden::make('direccion_real')->default(null)->dehydrated(false),
+
+        Hidden::make('auto_tercero_modo')
+        ->default(false)
+        ->dehydrated(false)
+        ->live(),
+
                 // =========================================================
                 // BARRA DE BÚSQUEDA PRINCIPAL + CREAR TERCERO
                 // =========================================================
@@ -54,26 +91,343 @@ class InformacionClienteStep
                             'lg'      => 8,
                         ])
                     ->schema([
+                     
+
+  
                         Hidden::make('dummy_left')->dehydrated(false),
 
                         TextInput::make('busqueda_tercero')
                             ->label('Buscar tercero (cédula o nombre)Ingrese al menos 2 caracteres ')
+                            ->disabled(fn (Get $get) => (bool) $get('auto_tercero_modo'))
                            //->helperText('Ingrese al menos 2 caracteres (cédula o nombre) y presione "Buscar".')
-                            ->extraAttributes([
-                                'class' => 'w-full text-sm md:text-base',
-                                // ENTER aquí dispara SOLO la lupa principal
-                                'x-on:keydown.enter.prevent' => '$refs.buscarTerceroBtn && $refs.buscarTerceroBtn.click()',
-                            ])
-                            ->live(false)
-                            ->afterStateHydrated(function ($state, Set $set) {
-                                // Si el campo está vacío pero la URL trae ?cedula=, la ponemos como valor
-                                if (blank($state) && request()->has('cedula')) {
-                                    $cedula = trim((string) request()->query('cedula'));
-                                    if ($cedula !== '') {
-                                        $set('busqueda_tercero', $cedula);
+                           ->extraAttributes([
+                                'x-data' => '{}',
+                                'x-init' => <<<'JS'
+                                    
+                                    
+
+                                    const params = new URLSearchParams(window.location.search);
+                                    const ced = (params.get('cedula') || '').trim();
+
+                                    
+
+                                    if (!ced) return;
+
+                                    // Evitar repetición por re-renders
+                                    window.__autoTercero = window.__autoTercero || { done: false, cedula: null };
+                                    if (window.__autoTercero.done && window.__autoTercero.cedula === ced) {
+                                    
+                                        return;
                                     }
+
+                                    const isVisible = (el) => {
+                                        if (!el) return false;
+                                        const s = getComputedStyle(el);
+                                        return s.display !== 'none' && s.visibility !== 'hidden' && el.offsetParent !== null;
+                                    };
+
+                                    const findInput = () =>
+                                        $el.querySelector('input') || document.querySelector('input[name$="[busqueda_tercero]"], input[name$="busqueda_tercero"], input[id$="busqueda_tercero"]');
+
+                                    const findBuscarBtn = () =>
+                                        $el.querySelector('[x-ref="buscarTerceroBtn"]') || document.querySelector('[x-ref="buscarTerceroBtn"]');
+
+                                    const tryRun = (origin) => {
+                                        const input = findInput();
+                                        const btn = findBuscarBtn();
+
+                                    
+
+                                        if (!input || !isVisible(input)) return;
+
+                                        // Espera a que el valor del input coincida EXACTO con la cédula
+                                        if ((input.value || '').trim() !== ced) return;
+
+                                        // Click buscar
+                                        if (!btn) return;
+                                    
+
+                                        // Luego intentar auto-seleccionar coincidencia exacta
+                                        const selectExact = () => {
+                                            // Busca un input en resultados con value exacto = cedula (modal o no)
+                                            const scope = document.querySelector('[role="dialog"]') || document;
+                                            const match = [...scope.querySelectorAll('input')].find(i => (i.value || '').trim() === ced);
+                                        
+
+                                            if (!match) return;
+
+                                            const row =
+                                                match.closest('.fi-fo-repeater-item') ||
+                                                match.closest('[wire\\:key]') ||
+                                                match.closest('tr') ||
+                                                match.parentElement;
+
+                                            if (!row) return;
+
+                                            const btnSel = [...row.querySelectorAll('button')].find(b => {
+                                                const t = (b.innerText || '').trim();
+                                                const aria = (b.getAttribute('aria-label') || '');
+                                                const title = (b.getAttribute('title') || '');
+                                                return t === 'Seleccionar' || aria.includes('Seleccionar') || title.includes('Seleccionar');
+                                            });
+
+                                        
+                                            if (!btnSel) return;
+
+                                        
+                                            window.__autoTercero = { done: true, cedula: ced };
+                                            btnSel.click();
+                                        };
+
+                                        // Observa cambios (cuando pintan resultados)
+                                        const obs = new MutationObserver(() => selectExact());
+                                        obs.observe(document.body, { childList: true, subtree: true });
+
+                                        setTimeout(selectExact, 150);
+                                        setTimeout(selectExact, 500);
+                                        setTimeout(() => obs.disconnect(), 8000);
+                                    };
+
+                                    // Reintentos: cuando entras al Step 2, esto empieza a funcionar
+                                    let t = 0;
+                                    const iv = setInterval(() => {
+                                        t++;
+                                        tryRun('interval');
+                                        if (window.__autoTercero?.done || t > 100) clearInterval(iv);
+                                    }, 50);
+
+                                    // Livewire hook (si está disponible)
+                                    const hook = () => {
+                                        if (window.Livewire?.hook) {
+                                            Livewire.hook('message.processed', () => tryRun('livewire.processed'));
+                                        
+                                        } else {
+                                            setTimeout(hook, 100);
+                                        }
+                                    };
+                                    hook();
+
+                                    tryRun('init');
+                            JS,
+                            ])
+
+                            ->live(false)
+                           ->afterStateHydrated(function ($state, Set $set, Get $get) {
+                                $cedulaUrl = request()->has('cedula')
+                                    ? trim((string) request()->query('cedula'))
+                                    : '';
+
+                                Log::info('InformacionClienteStep::busqueda_tercero afterStateHydrated', [
+                                    'state'     => $state,
+                                    'has_cedula'=> request()->has('cedula'),
+                                    'cedula'    => $cedulaUrl,
+                                    'url'       => request()->fullUrl(),
+                                    'auto_done' => $get('auto_tercero_done'),
+                                    'auto_lock' => $get('auto_tercero_lock'),
+                                    'auto_ced'  => $get('auto_tercero_cedula'),
+                                ]);
+
+                                if ($cedulaUrl === '') return;
+
+                                $set('auto_tercero_modo', true);
+
+
+                                // Si ya lo hicimos para esta misma cédula, salir
+                                if ($get('auto_tercero_done') === true && (string) $get('auto_tercero_cedula') === (string) $cedulaUrl) {
+                                    Log::info('Auto tercero: ya ejecutado para esta cédula (state), se omite', ['cedula' => $cedulaUrl]);
+                                    return;
+                                }
+
+                                // Candado anti doble-ejecución por re-render
+                                if ($get('auto_tercero_lock') === true) {
+                                    Log::info('Auto tercero: lock activo, se omite', ['cedula' => $cedulaUrl]);
+                                    return;
+                                }
+                                $set('auto_tercero_lock', true);
+
+                                // Asegurar que el input muestre la cédula
+                                if (blank($state)) {
+                                    $set('busqueda_tercero', $cedulaUrl);
+                                    Log::info('busqueda_tercero seteada desde URL', ['cedula' => $cedulaUrl]);
+                                }
+
+                                try {
+                                    Log::info('Auto tercero: iniciando búsqueda API', ['cedula' => $cedulaUrl]);
+
+                                    $response = Http::acceptJson()->post(route('api.terceros.buscar'), [
+                                        'query' => $cedulaUrl,
+                                    ]);
+
+                                    Log::info('Auto tercero: API status', [
+                                        'cedula' => $cedulaUrl,
+                                        'ok'     => $response->ok(),
+                                        'status' => $response->status(),
+                                    ]);
+
+                                    if (! $response->ok()) {
+                                        Log::warning('Auto tercero: API no OK', [
+                                            'cedula' => $cedulaUrl,
+                                            'body'   => $response->body(),
+                                        ]);
+                                        $set('auto_tercero_lock', false);
+                                        return;
+                                    }
+
+                                    $body = $response->json();
+                                    $data = $body['data'] ?? [];
+                                    if (! is_array($data)) $data = [$data];
+
+                                    Log::info('Auto tercero: API body resumen', [
+                                        'cedula'  => $cedulaUrl,
+                                        'success' => (bool) ($body['success'] ?? false),
+                                        'count'   => is_array($data) ? count($data) : null,
+                                    ]);
+
+                                    if (! ($body['success'] ?? false) || empty($data)) {
+                                        $set('auto_tercero_lock', false);
+                                        return;
+                                    }
+
+                                    // MISMO MAPEO UNIFORME que usas en buscarTercero (para que las llaves coincidan)
+                                    $clientes = collect($data)->map(function ($item) {
+                                        $arr = is_array($item) ? $item : (array) $item;
+
+                                        $cedula = $arr['cedula'] ?? $arr['nit'] ?? $arr['codigoInterno'] ?? null;
+
+                                        $razonSocial = $arr['descripcion'] ?? $arr['nombreComercial'] ?? $arr['ID_Cliente_Nombre'] ?? null;
+                                        $nombreGenerico = $arr['nombre'] ?? $arr['nombre_completo'] ?? $razonSocial;
+
+                                        return [
+                                            'cedula'              => $cedula ? (string) $cedula : null,
+                                            'nombre'              => $nombreGenerico,
+                                            'telefono'            => (string) ($arr['telefono'] ?? $arr['tel'] ?? $arr['telefono1'] ?? $arr['celular'] ?? ''),
+                                            'direccion'           => $arr['direccion'] ?? null,
+                                            'email'               => $arr['email'] ?? $arr['emailFacturacionElectronica'] ?? null,
+                                            'ciudad'              => $arr['descripcionCiudad'] ?? null,
+                                            'zona'                => $arr['descripcionZona'] ?? null,
+                                            'tipo_identificacion' => $arr['descTipoIdentificacionTrib'] ?? null,
+                                            'razon_social'        => $razonSocial,
+
+                                            'nombre1'             => $arr['nombre1'] ?? null,
+                                            'nombre2'             => $arr['nombre2'] ?? null,
+                                            'apellido1'           => $arr['apellido1'] ?? null,
+                                            'apellido2'           => $arr['apellido2'] ?? null,
+
+                                            'nombre_comercial'    => $arr['nombreComercial'] ?? null,
+                                            'barrio'              => $arr['barrio'] ?? null,
+                                            'codigoInterno'       => $arr['codigoInterno'] ?? null,
+                                        ];
+                                    })->values();
+
+                                    // MATCH EXACTO
+                                    $registro = $clientes->first(fn ($row) => (string) ($row['cedula'] ?? '') === (string) $cedulaUrl);
+
+                                    if (! $registro) {
+                                        Log::info('Auto tercero: no hubo match exacto', [
+                                            'cedula' => $cedulaUrl,
+                                            'primeros' => $clientes->take(3)->pluck('cedula')->all(),
+                                        ]);
+
+
+                                         Notification::make()
+                                            ->title('No se encontró la cedula del cliente para la siguiente sección')
+                                            ->body('Debe solicitar con el área de cartera una validación del número de cédula. Posiblemente no coincide con la registrada en la creación.')
+                                            ->warning()
+                                            ->duration(600000) // 10 minutos
+                                            ->send();
+
+                                        $set('auto_tercero_lock', false);
+                                        return;
+                                    }
+
+                                    Log::info('Auto tercero: match exacto encontrado', [
+                                        'cedula' => $cedulaUrl,
+                                        'tipo'   => $registro['tipo_identificacion'] ?? null,
+                                    ]);
+
+                                    // APLICAR EXACTAMENTE lo mismo que hace seleccionar_tercero
+                                    $tipoIdUpper = strtoupper(trim((string) ($registro['tipo_identificacion'] ?? '')));
+
+                                    if ($tipoIdUpper === 'NIT') {
+                                        $set('nombre_cliente', $registro['razon_social'] ?: $registro['nombre']);
+                                        $set('nombre1_cliente', null);
+                                        $set('nombre2_cliente', null);
+                                        $set('apellido1_cliente', null);
+                                        $set('apellido2_cliente', null);
+                                    } else {
+                                        $set('nombre_cliente', null);
+                                        $set('nombre1_cliente', $registro['nombre1']);
+                                        $set('nombre2_cliente', $registro['nombre2']);
+                                        $set('apellido1_cliente', $registro['apellido1']);
+                                        $set('apellido2_cliente', $registro['apellido2']);
+                                    }
+
+                                                //  Fuente de verdad (lo que enciende la sección)
+                                        $set('cedula_cliente_real', (string) ($registro['cedula'] ?? ''));
+                                        $set('tipo_identificacion_cliente_real', $registro['tipo_identificacion'] ?? null);
+
+                                    if ($tipoIdUpper === 'NIT') {
+                                        $set('nombre_cliente_real', $registro['razon_social'] ?: $registro['nombre']);
+                                        $set('nombre1_cliente_real', null);
+                                        $set('nombre2_cliente_real', null);
+                                        $set('apellido1_cliente_real', null);
+                                        $set('apellido2_cliente_real', null);
+                                    } else {
+                                        $set('nombre_cliente_real', null);
+                                        $set('nombre1_cliente_real', $registro['nombre1'] ?? null);
+                                        $set('nombre2_cliente_real', $registro['nombre2'] ?? null);
+                                        $set('apellido1_cliente_real', $registro['apellido1'] ?? null);
+                                        $set('apellido2_cliente_real', $registro['apellido2'] ?? null);
+                                    }
+
+                                    $set('telefono_real', $registro['telefono'] ?? null);
+                                    $set('direccion_real', $registro['direccion'] ?? null);
+                                    $set('email_cliente_real', $registro['email'] ?? null);
+                                    $set('ciudad_cliente_real', $registro['ciudad'] ?? null);
+                                    $set('zona_cliente_real', $registro['zona'] ?? null);
+                                    $set('nombre_comercial_cliente_real', $registro['nombre_comercial'] ?? null);
+                                    $set('barrio_cliente_real', $registro['barrio'] ?? null);
+
+                                    // Opcional si sigues usando flags
+                                    $set('mostrar_detalle_tercero', true);
+                                    $set('mostrar_modal_resultados', false);
+
+                                    $set('telefono', $registro['telefono']);
+                                    $set('direccion', $registro['direccion']);
+                                    $set('email_cliente', $registro['email']);
+                                    $set('ciudad_cliente', $registro['ciudad']);
+                                    $set('zona_cliente', $registro['zona']);
+                                    $set('tipo_identificacion_cliente', $registro['tipo_identificacion']);
+                                    $set('nombre_comercial_cliente', $registro['nombre_comercial']);
+                                    $set('barrio_cliente', $registro['barrio']);
+
+                                    // (Opcional) si tu UI depende de este flag para mostrar detalles
+                                    $set('mostrar_detalle_tercero', true);
+
+                                    // Marcar DONE solo al final, cuando ya se llenó bien
+                                    $set('auto_tercero_done', true);
+                                    $set('auto_tercero_cedula', $cedulaUrl);
+
+                                    Log::info('Auto tercero: campos seteados ', ['cedula' => $cedulaUrl]);
+                                    Log::info('Auto tercero: verificación state', [
+                                'mostrar_detalle_tercero' => $get('mostrar_detalle_tercero'),
+                                'cedula' => $get('cedula'),
+                                'tipo_identificacion_cliente' => $get('tipo_identificacion_cliente'),
+                                'nombre1_cliente' => $get('nombre1_cliente'),
+                            ]);
+
+
+                                } catch (\Throwable $e) {
+                                    Log::error('Auto tercero: excepción', [
+                                        'cedula' => $cedulaUrl,
+                                        'error'  => $e->getMessage(),
+                                    ]);
+                                } finally {
+                                    $set('auto_tercero_lock', false);
                                 }
                             })
+
+
                             ->columnSpan([
                                 'default' => 8, // en móvil ocupa todo el ancho
                                 'md'      => 4, // desde md ocupa 5/8
@@ -85,6 +439,7 @@ class InformacionClienteStep
                                     ->label('Buscar')
                                     ->icon('heroicon-o-magnifying-glass')
                                     ->color('primary')
+                                    ->disabled(fn (Get $get) => (bool) $get('auto_tercero_modo'))
                                     ->extraAttributes([
                                         'x-ref' => 'buscarTerceroBtn',
                                     ])
@@ -144,6 +499,29 @@ class InformacionClienteStep
                                         $set('nombre_comercial_cliente', null);
                                         $set('barrio_cliente', null);
                                         $set('mostrar_detalle_tercero', false);
+                                      
+                                        // NUEVO: limpiar también los “*_real” (fuente de verdad del UI)
+                                        $set('cedula_cliente_real', null);
+                                        $set('tipo_identificacion_cliente_real', null);
+
+                                        $set('nombre_cliente_real', null);
+                                        $set('nombre1_cliente_real', null);
+                                        $set('nombre2_cliente_real', null);
+                                        $set('apellido1_cliente_real', null);
+                                        $set('apellido2_cliente_real', null);
+
+                                        $set('telefono_real', null);
+                                        $set('direccion_real', null);
+                                        $set('email_cliente_real', null);
+                                        $set('ciudad_cliente_real', null);
+                                        $set('zona_cliente_real', null);
+                                        $set('nombre_comercial_cliente_real', null);
+                                        $set('barrio_cliente_real', null);
+
+                                        $set('auto_tercero_done', false);
+                                        $set('auto_tercero_lock', false);
+                                        $set('auto_tercero_cedula', null);
+
 
                                         try {
                                             $response = Http::acceptJson()
@@ -321,21 +699,23 @@ class InformacionClienteStep
 
                                  ->columnSpan(5),   // ← ocupa 9 de 12 columnas (ajustable)
 
-                                // ⬇️ NUEVO: botón Crear tercero separado, alineado a la derecha
+                                // ⬇ NUEVO: botón Crear tercero separado, alineado a la derecha
                                 \Filament\Forms\Components\Actions::make([
 
-                                // ➕ Crear tercero
+                                //  Crear tercero
                                 Action::make('abrirCrearTercero')
                                     ->label('Crear tercero')
                                     ->icon('heroicon-o-user-plus')
                                     ->color('success')
+                                    //para bloquear el botón cuando está en modo auto_tercero_modo
+                                    ->disabled(fn (Get $get) => (bool) $get('auto_tercero_modo'))
                                     ->extraAttributes([
                                         // un poco de margen a la izquierda en pantallas medianas en adelante
                                         'class' => 'md:ml-4',
                                     ])
                                     ->action(function (Set $set) {
 
-                                        // 🔹 1. LIMPIAR SIEMPRE LOS DATOS DEL TERCERO YA SELECCIONADO
+                                        //  1. LIMPIAR SIEMPRE LOS DATOS DEL TERCERO YA SELECCIONADO
                                         //    (esto hace que la validación vea la identificación como vacía)
 
                                         // Campo principal que se usa para validar el paso:
@@ -361,12 +741,12 @@ class InformacionClienteStep
                                         $set('tercero_seleccionado', null);
                                         $set('cliente_cargado', false);
 
-                                        // 🔹 2. OCULTAR MODAL DE RESULTADOS Y MOSTRAR MODAL DE CREACIÓN
+                                        // 2. OCULTAR MODAL DE RESULTADOS Y MOSTRAR MODAL DE CREACIÓN
                                         $set('mostrar_modal_resultados', false);
                                         $set('mostrar_modal_crear_tercero', true);
                                         $set('mostrar_detalle_tercero', false);
 
-                                        // 🔹 3. LIMPIAR CAMPOS DEL FORMULARIO DE CREACIÓN
+                                        // 3. LIMPIAR CAMPOS DEL FORMULARIO DE CREACIÓN
                                         $set('nuevo_naturaleza', null);
                                         $set('nuevo_tipo_identificacion', null);
                                         $set('nuevo_nit', null);
@@ -677,6 +1057,33 @@ class InformacionClienteStep
                                                             'telefono2_cliente'             => $tel2,
                                                             'celular_cliente'               => $celular,
                                                         ]);
+
+                                                        // NUEVO: setear los *_real (fuente de verdad para la sección)
+                                                        $set('../../cedula_cliente_real', (string) ($cedula ?? ''));
+                                                        $set('../../tipo_identificacion_cliente_real', $tipoId);
+
+                                                        if ($tipoIdUpper === 'NIT') {
+                                                            $set('../../nombre_cliente_real', $razon ?: $nombre);
+                                                            $set('../../nombre1_cliente_real', null);
+                                                            $set('../../nombre2_cliente_real', null);
+                                                            $set('../../apellido1_cliente_real', null);
+                                                            $set('../../apellido2_cliente_real', null);
+                                                        } else {
+                                                            $set('../../nombre_cliente_real', null);
+                                                            $set('../../nombre1_cliente_real', $nombre1);
+                                                            $set('../../nombre2_cliente_real', $nombre2);
+                                                            $set('../../apellido1_cliente_real', $apellido1);
+                                                            $set('../../apellido2_cliente_real', $apellido2);
+                                                        }
+
+                                                        $set('../../telefono_real', $telefono);
+                                                        $set('../../direccion_real', $direccion);
+                                                        $set('../../email_cliente_real', $email);
+                                                        $set('../../ciudad_cliente_real', $ciudad);
+                                                        $set('../../zona_cliente_real', $zona);
+                                                        $set('../../nombre_comercial_cliente_real', $nombreComercial);
+                                                        $set('../../barrio_cliente_real', $barrio);
+
 
                                                         $set('../../mostrar_modal_resultados', false);
                                                         $set('../../mostrar_detalle_tercero', true);
@@ -1447,7 +1854,10 @@ class InformacionClienteStep
                                                             $fullNombreSeleccion = $fullNombreNatural;
                                                         }
 
-                                                        $set('cedula', $nit);
+                                                       // $set('cedula_cliente_real', (string) $registro['cedula']);
+                                                
+
+                                                        $set('cedula', (string) $nit);
                                                         $set('tipo_identificacion_cliente', $tipoDesc);
                                                         $set('telefono', $cel ?: $telAlt);
                                                         $set('direccion', $data['direccion']);
@@ -1457,7 +1867,7 @@ class InformacionClienteStep
                                                         $set('nombre_comercial_cliente', $nombreComercialApi);
                                                         $set('barrio_cliente', $data['barrio']);
 
-                                                         // 🔹 Campos ocultos usados por la validación de reservas
+                                                         //  Campos ocultos usados por la validación de reservas
                                                         //    (para que el flujo de reservas funcione igual que cuando se selecciona desde el modal de resultados)
                                                         $set('numero_identificacion_cliente', $nit);           // viene del nuevo tercero
                                                         $set('telefono1_cliente',             $telAlt ?? null); // teléfono alterno del formulario
@@ -1480,6 +1890,33 @@ class InformacionClienteStep
                                                             $set('apellido1_cliente', $data['apellido1']);
                                                             $set('apellido2_cliente', $data['apellido2']);
                                                         }
+
+
+                                                        //  NUEVO: llenar fuente de verdad para la UI (campos *_real)
+                                                        $set('cedula_cliente_real', (string) $nit);
+                                                        $set('tipo_identificacion_cliente_real', $tipoDesc);
+
+                                                        if ($tipoUpper === 'NIT') {
+                                                            $set('nombre_cliente_real', $fullNombreSeleccion);
+                                                            $set('nombre1_cliente_real', null);
+                                                            $set('nombre2_cliente_real', null);
+                                                            $set('apellido1_cliente_real', null);
+                                                            $set('apellido2_cliente_real', null);
+                                                        } else {
+                                                            $set('nombre_cliente_real', null);
+                                                            $set('nombre1_cliente_real', $data['nombre1']);
+                                                            $set('nombre2_cliente_real', $data['nombre2']);
+                                                            $set('apellido1_cliente_real', $data['apellido1']);
+                                                            $set('apellido2_cliente_real', $data['apellido2']);
+                                                        }
+
+                                                        $set('telefono_real', $cel ?: $telAlt);
+                                                        $set('direccion_real', $data['direccion']);
+                                                        $set('email_cliente_real', $email);
+                                                        $set('ciudad_cliente_real', $municipioResidencia?->name_municipio);
+                                                        $set('zona_cliente_real', null);
+                                                        $set('nombre_comercial_cliente_real', $nombreComercialApi);
+                                                        $set('barrio_cliente_real', $data['barrio']);
 
                                                         $set('mostrar_modal_crear_tercero', false);
                                                         $set('mostrar_detalle_tercero', true);
@@ -1539,7 +1976,7 @@ class InformacionClienteStep
                                                             $messages[] = 'Código: ' . $respuestaApi['datos'];
                                                         }
 
-                                                        // 👉 NUEVO: tratamiento especial para ALERT_ALREADY_EXIST
+                                                        // NUEVO: tratamiento especial para ALERT_ALREADY_EXIST
                                                         $codigoDatos = $respuestaApi['datos'] ?? null;
                                                         if (is_string($codigoDatos) && strtoupper($codigoDatos) === 'ALERT_ALREADY_EXIST') {
                                                             Notification::make()
@@ -1620,11 +2057,13 @@ class InformacionClienteStep
                 // DATOS DEL CLIENTE SELECCIONADO (sección debajo)
                 // =========================================================
                 Section::make('Datos del cliente seleccionado')
-                    ->visible(fn (Get $get) => (bool) $get('mostrar_detalle_tercero'))
+                        ->visible(fn (Get $get) => filled($get('cedula_cliente_real')))
+
                     ->schema([
                         TextInput::make('tipo_identificacion_cliente')
                             ->label('Tipo identificación')
                             ->disabled()
+                            ->formatStateUsing(fn (Get $get) => $get('tipo_identificacion_cliente_real'))
                             ->maxLength(100),
 
                         TextInput::make('cedula')
@@ -1632,6 +2071,8 @@ class InformacionClienteStep
                             ->maxLength(30)
                             ->disabled()
                             ->required()
+                            ->formatStateUsing(fn (Get $get) => $get('cedula_cliente_real'))
+
                             ->validationMessages([
                                 'required' => 'Debe seleccionar un tercero (el número de identificación no puede estar vacío).',
                             ])
@@ -1646,7 +2087,7 @@ class InformacionClienteStep
 
                         TextInput::make('nombre_cliente')
                             ->label(function (Get $get) {
-                                $tipo = strtoupper((string) ($get('tipo_identificacion_cliente') ?? ''));
+                                $tipo = strtoupper((string) ($get('tipo_identificacion_cliente_real') ?? ''));
                                 return $tipo === 'NIT'
                                     ? 'Razón social'
                                     : 'Nombre del cliente';
@@ -1654,9 +2095,10 @@ class InformacionClienteStep
                             ->maxLength(255)
                             ->columnSpan(3)
                             ->visible(function (Get $get) {
-                                $tipo = strtoupper((string) ($get('tipo_identificacion_cliente') ?? ''));
+                                $tipo = strtoupper((string) ($get('tipo_identificacion_cliente_real') ?? ''));
                                 return $tipo === 'NIT';
                             })
+                            ->formatStateUsing(fn (Get $get) => $get('nombre_cliente_real'))
                             ->disabled(),
 
                         Grid::make(4)
@@ -1668,21 +2110,25 @@ class InformacionClienteStep
                                 TextInput::make('nombre1_cliente')
                                     ->label('Primer nombre')
                                     ->maxLength(100)
+                                    ->formatStateUsing(fn (Get $get) => $get('nombre1_cliente_real'))
                                     ->disabled(),
 
                                 TextInput::make('nombre2_cliente')
                                     ->label('Segundo nombre')
                                     ->maxLength(100)
+                                    ->formatStateUsing(fn (Get $get) => $get('nombre2_cliente_real'))
                                     ->disabled(),
 
                                 TextInput::make('apellido1_cliente')
                                     ->label('Primer apellido')
                                     ->maxLength(100)
+                                    ->formatStateUsing(fn (Get $get) => $get('apellido1_cliente_real'))
                                     ->disabled(),
 
                                 TextInput::make('apellido2_cliente')
                                     ->label('Segundo apellido')
                                     ->maxLength(100)
+                                    ->formatStateUsing(fn (Get $get) => $get('apellido2_cliente_real'))
                                     ->disabled(),
                             ])
                             ->columnSpanFull(),
@@ -1691,6 +2137,7 @@ class InformacionClienteStep
                             ->label('Teléfono')
                             ->tel()
                             ->maxLength(30)
+                            ->formatStateUsing(fn (Get $get) => $get('telefono_real'))
                             ->disabled(),
 
                         TextInput::make('email_cliente')
@@ -1698,33 +2145,39 @@ class InformacionClienteStep
                             ->email()
                             ->maxLength(255)
                             ->columnSpan(2)
+                            ->formatStateUsing(fn (Get $get) => $get('email_cliente_real'))
                             ->disabled(),
 
                         TextInput::make('ciudad_cliente')
                             ->label('Ciudad')
                             ->maxLength(255)
+                            ->formatStateUsing(fn (Get $get) => $get('ciudad_cliente_real'))
                             ->disabled(),
 
                         TextInput::make('zona_cliente')
-                            ->label('Zona')
+                            ->label('Departamento')
                             ->maxLength(255)
+                            ->formatStateUsing(fn (Get $get) => $get('zona_cliente_real'))
                             ->disabled(),
 
                         TextInput::make('nombre_comercial_cliente')
                             ->label('Nombre comercial')
                             ->maxLength(255)
                             ->columnSpan(2)
+                            ->formatStateUsing(fn (Get $get) => $get('nombre_comercial_cliente_real'))
                             ->disabled(),
 
                         TextInput::make('barrio_cliente')
                             ->label('Barrio')
                             ->maxLength(255)
+                            ->formatStateUsing(fn (Get $get) => $get('barrio_cliente_real'))
                             ->disabled(),
 
                         Textarea::make('direccion')
                             ->label('Dirección')
                             ->rows(2)
                             ->columnSpanFull()
+                            ->formatStateUsing(fn (Get $get) => $get('direccion_real'))
                             ->disabled(),
                     ])
                     ->columns(4),
@@ -1753,8 +2206,8 @@ class InformacionClienteStep
                     ->dehydrated(false),
 
                 Hidden::make('mostrar_detalle_tercero')
-                    ->default(false)
-                    ->dehydrated(false),
+                    ->dehydrated(false)
+                    ->live(),
 
                 Hidden::make('filtro_cedula')
                     ->default('')
@@ -1770,7 +2223,16 @@ class InformacionClienteStep
 
                 Hidden::make('per_page_resultados')
                     ->default(5)
-                    ->dehydrated(false),
+                    ->dehydrated(false)
+                    ->afterStateHydrated(function (Get $get) {
+                        \Log::info('FIN hydration Step2 (estado final)', [
+                            'mostrar_detalle_tercero' => $get('mostrar_detalle_tercero'),
+                            'auto_tercero_done'       => $get('auto_tercero_done'),
+                            'cedula'                  => $get('cedula'),
+                            'busqueda_tercero'        => $get('busqueda_tercero'),
+                        ]);
+                    }),
+
             ])
             ->columns(1)
             ->afterValidation(function (Get $get) {
@@ -1791,7 +2253,7 @@ class InformacionClienteStep
 
                    \Log::info('[ReservaCheck] --- INICIO afterValidation Información del cliente ---');
 
-            // 🔹 Datos del cliente seleccionados (ya lo tenías)
+            // Datos del cliente seleccionados (ya lo tenías)
             $numeroIdentCliente = $get('numero_identificacion_cliente');
             $tel1               = $get('telefono1_cliente');
             $tel2               = $get('telefono2_cliente');
@@ -1810,7 +2272,7 @@ class InformacionClienteStep
                 return;
             }
 
-            // 🔹 Teléfonos válidos
+            // Teléfonos válidos
             $telefonos = collect([$tel1, $tel2, $celular])
                 ->filter(fn ($t) => filled($t))
                 ->values()
@@ -1913,7 +2375,7 @@ class InformacionClienteStep
         // ================================
         \Log::info('[ReservaCheck] Reserva en estado PENDIENTE. Se validará si pertenece al mismo asesor.');
 
-        // 🔹 LEER BIEN EL REPETER detallesCliente DESDE LA RAÍZ
+        //  LEER BIEN EL REPETER detallesCliente DESDE LA RAÍZ
         $detallesCliente = $get('detallesCliente') ?? [];
 
         \Log::info('[ReservaCheck] Estado completo de detallesCliente', [
@@ -2061,17 +2523,17 @@ class InformacionClienteStep
 
             $ok = true;
 
-           if ($fCedula !== '') {
-               $ok = $ok && str_contains($cedula, $fCedula);
-           }
+            if ($fCedula !== '') {
+                $ok = $ok && str_contains($cedula, $fCedula);
+            }
 
-           if ($fNombre !== '') {
-               $ok = $ok && str_contains($nombre, $fNombre);
-           }
+            if ($fNombre !== '') {
+                $ok = $ok && str_contains($nombre, $fNombre);
+            }
 
-           if ($fTel !== '') {
-               $ok = $ok && str_contains($telefono, $fTel);
-           }
+            if ($fTel !== '') {
+                $ok = $ok && str_contains($telefono, $fTel);
+            }
 
             return $ok;
         })->values()->all();

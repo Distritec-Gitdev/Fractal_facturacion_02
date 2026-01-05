@@ -112,7 +112,7 @@ class SeleccionProductosStep
                                         'lg' => 8,
                                     ]),
 
-                                // Campo de Total Final
+                                // Campo de Total Final 
                                 Grid::make()
                                     ->schema([
                                         Placeholder::make('label_total')
